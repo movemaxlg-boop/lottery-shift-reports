@@ -1,0 +1,351 @@
+
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('Starting database seed...');
+
+  // Clear existing data
+  await prisma.ticketScan.deleteMany();
+  await prisma.shift.deleteMany();
+  await prisma.ticketSlot.deleteMany();
+  await prisma.lotteryGame.deleteMany();
+  await prisma.store.deleteMany();
+  await prisma.user.deleteMany();
+
+  // Create store configuration
+  const store = await prisma.store.create({
+    data: {
+      name: 'Lucky Lottery Store',
+      address: '123 Main Street, City, State 12345',
+      phone: '(555) 123-4567',
+    },
+  });
+  console.log('Store created:', store.name);
+
+  // Hash password for users
+  const hashedPassword = await bcrypt.hash('johndoe123', 10);
+  const hashedSarahPassword = await bcrypt.hash('sarah123', 10);
+  const hashedLizdaPassword = await bcrypt.hash('lizda123', 10);
+
+  // Create users
+  const admin = await prisma.user.create({
+    data: {
+      email: 'john@doe.com',
+      password: hashedPassword,
+      firstName: 'John',
+      lastName: 'Doe',
+      role: 'manager',
+    },
+  });
+  console.log('Admin user created:', admin.email);
+
+  const sarah = await prisma.user.create({
+    data: {
+      email: 'sarah@store.com',
+      password: hashedSarahPassword,
+      firstName: 'Sarah',
+      lastName: 'Johnson',
+      role: 'cashier',
+    },
+  });
+  console.log('Cashier created:', sarah.email);
+
+  const lizda = await prisma.user.create({
+    data: {
+      email: 'lizda@store.com',
+      password: hashedLizdaPassword,
+      firstName: 'Lizda',
+      lastName: 'Martinez',
+      role: 'cashier',
+    },
+  });
+  console.log('Cashier created:', lizda.email);
+
+  // Create lottery games
+  const game1234 = await prisma.lotteryGame.create({
+    data: {
+      gameId: '1234',
+      gameName: 'Super Cash',
+      packNumber: 'Pack A',
+      pricePerTicket: 5.00,
+      active: true,
+    },
+  });
+  console.log('Game created:', game1234.gameId);
+
+  const game5678 = await prisma.lotteryGame.create({
+    data: {
+      gameId: '5678',
+      gameName: 'Mega Millions',
+      packNumber: 'Pack B',
+      pricePerTicket: 10.00,
+      active: true,
+    },
+  });
+  console.log('Game created:', game5678.gameId);
+
+  const game9012 = await prisma.lotteryGame.create({
+    data: {
+      gameId: '9012',
+      gameName: 'Lucky Seven',
+      packNumber: 'Pack C',
+      pricePerTicket: 2.00,
+      active: true,
+    },
+  });
+  console.log('Game created:', game9012.gameId);
+
+  // Create ticket slots
+  const slot1 = await prisma.ticketSlot.create({
+    data: {
+      slotNumber: 1,
+      gameId: game1234.id,
+      active: true,
+    },
+  });
+
+  const slot2 = await prisma.ticketSlot.create({
+    data: {
+      slotNumber: 2,
+      gameId: game5678.id,
+      active: true,
+    },
+  });
+
+  const slot3 = await prisma.ticketSlot.create({
+    data: {
+      slotNumber: 3,
+      gameId: game9012.id,
+      active: true,
+    },
+  });
+
+  console.log('Ticket slots created');
+
+  // Create sample date for shifts (today)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Create morning shift for Sarah
+  const morningShift = await prisma.shift.create({
+    data: {
+      date: today,
+      shiftType: 'morning',
+      cashierId: sarah.id,
+      startTime: '06:00 AM',
+      endTime: '02:00 PM',
+      qrCode: 'CASHIER:Sarah:Morning_Shift',
+    },
+  });
+  console.log('Morning shift created for Sarah');
+
+  // Create afternoon shift for Lizda
+  const afternoonShift = await prisma.shift.create({
+    data: {
+      date: today,
+      shiftType: 'afternoon',
+      cashierId: lizda.id,
+      startTime: '02:00 PM',
+      endTime: '10:00 PM',
+      qrCode: 'CASHIER:Lizda:Afternoon_Shift',
+    },
+  });
+  console.log('Afternoon shift created for Lizda');
+
+  // Create ticket scans for morning shift (Sarah)
+  // Slot 1: Game 1234 ($5) - tickets 015→025 (10 sold)
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: morningShift.id,
+      slotId: slot1.id,
+      scanType: 'start',
+      ticketNumber: '015',
+      scannedAt: new Date(today.getTime() + 6 * 60 * 60 * 1000), // 6 AM
+    },
+  });
+
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: morningShift.id,
+      slotId: slot1.id,
+      scanType: 'end',
+      ticketNumber: '025',
+      scannedAt: new Date(today.getTime() + 14 * 60 * 60 * 1000), // 2 PM
+    },
+  });
+
+  // Slot 2: Game 5678 ($10) - tickets 001→015 (14 sold)
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: morningShift.id,
+      slotId: slot2.id,
+      scanType: 'start',
+      ticketNumber: '001',
+      scannedAt: new Date(today.getTime() + 6 * 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: morningShift.id,
+      slotId: slot2.id,
+      scanType: 'end',
+      ticketNumber: '015',
+      scannedAt: new Date(today.getTime() + 14 * 60 * 60 * 1000),
+    },
+  });
+
+  // Slot 3: Game 9012 ($2) - tickets 050→058 (8 sold)
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: morningShift.id,
+      slotId: slot3.id,
+      scanType: 'start',
+      ticketNumber: '050',
+      scannedAt: new Date(today.getTime() + 6 * 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: morningShift.id,
+      slotId: slot3.id,
+      scanType: 'end',
+      ticketNumber: '058',
+      scannedAt: new Date(today.getTime() + 14 * 60 * 60 * 1000),
+    },
+  });
+
+  console.log('Morning shift scans created');
+
+  // Create ticket scans for afternoon shift (Lizda)
+  // Slot 1: Game 1234 ($5) - tickets 025→027 (2 sold)
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: afternoonShift.id,
+      slotId: slot1.id,
+      scanType: 'start',
+      ticketNumber: '025',
+      scannedAt: new Date(today.getTime() + 14 * 60 * 60 * 1000), // 2 PM
+    },
+  });
+
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: afternoonShift.id,
+      slotId: slot1.id,
+      scanType: 'end',
+      ticketNumber: '027',
+      scannedAt: new Date(today.getTime() + 22 * 60 * 60 * 1000), // 10 PM
+    },
+  });
+
+  // Slot 2: Game 5678 ($10) - tickets 015→021 (6 sold)
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: afternoonShift.id,
+      slotId: slot2.id,
+      scanType: 'start',
+      ticketNumber: '015',
+      scannedAt: new Date(today.getTime() + 14 * 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: afternoonShift.id,
+      slotId: slot2.id,
+      scanType: 'end',
+      ticketNumber: '021',
+      scannedAt: new Date(today.getTime() + 22 * 60 * 60 * 1000),
+    },
+  });
+
+  // Slot 3: Game 9012 ($2) - tickets 058→065 (7 sold)
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: afternoonShift.id,
+      slotId: slot3.id,
+      scanType: 'start',
+      ticketNumber: '058',
+      scannedAt: new Date(today.getTime() + 14 * 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.ticketScan.create({
+    data: {
+      shiftId: afternoonShift.id,
+      slotId: slot3.id,
+      scanType: 'end',
+      ticketNumber: '065',
+      scannedAt: new Date(today.getTime() + 22 * 60 * 60 * 1000),
+    },
+  });
+
+  console.log('Afternoon shift scans created');
+
+  // Create additional sample data for yesterday
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const yesterdayMorningShift = await prisma.shift.create({
+    data: {
+      date: yesterday,
+      shiftType: 'morning',
+      cashierId: lizda.id,
+      startTime: '06:00 AM',
+      endTime: '02:00 PM',
+      qrCode: 'CASHIER:Lizda:Morning_Shift',
+    },
+  });
+
+  const yesterdayAfternoonShift = await prisma.shift.create({
+    data: {
+      date: yesterday,
+      shiftType: 'afternoon',
+      cashierId: sarah.id,
+      startTime: '02:00 PM',
+      endTime: '10:00 PM',
+      qrCode: 'CASHIER:Sarah:Afternoon_Shift',
+    },
+  });
+
+  // Add scans for yesterday's shifts
+  await prisma.ticketScan.createMany({
+    data: [
+      // Yesterday morning - Lizda - Slot 1
+      { shiftId: yesterdayMorningShift.id, slotId: slot1.id, scanType: 'start', ticketNumber: '001', scannedAt: new Date(yesterday.getTime() + 6 * 60 * 60 * 1000) },
+      { shiftId: yesterdayMorningShift.id, slotId: slot1.id, scanType: 'end', ticketNumber: '015', scannedAt: new Date(yesterday.getTime() + 14 * 60 * 60 * 1000) },
+      // Yesterday morning - Lizda - Slot 2
+      { shiftId: yesterdayMorningShift.id, slotId: slot2.id, scanType: 'start', ticketNumber: '100', scannedAt: new Date(yesterday.getTime() + 6 * 60 * 60 * 1000) },
+      { shiftId: yesterdayMorningShift.id, slotId: slot2.id, scanType: 'end', ticketNumber: '108', scannedAt: new Date(yesterday.getTime() + 14 * 60 * 60 * 1000) },
+      // Yesterday morning - Lizda - Slot 3
+      { shiftId: yesterdayMorningShift.id, slotId: slot3.id, scanType: 'start', ticketNumber: '030', scannedAt: new Date(yesterday.getTime() + 6 * 60 * 60 * 1000) },
+      { shiftId: yesterdayMorningShift.id, slotId: slot3.id, scanType: 'end', ticketNumber: '050', scannedAt: new Date(yesterday.getTime() + 14 * 60 * 60 * 1000) },
+      // Yesterday afternoon - Sarah - Slot 1
+      { shiftId: yesterdayAfternoonShift.id, slotId: slot1.id, scanType: 'start', ticketNumber: '015', scannedAt: new Date(yesterday.getTime() + 14 * 60 * 60 * 1000) },
+      { shiftId: yesterdayAfternoonShift.id, slotId: slot1.id, scanType: 'end', ticketNumber: '015', scannedAt: new Date(yesterday.getTime() + 22 * 60 * 60 * 1000) },
+      // Yesterday afternoon - Sarah - Slot 2
+      { shiftId: yesterdayAfternoonShift.id, slotId: slot2.id, scanType: 'start', ticketNumber: '108', scannedAt: new Date(yesterday.getTime() + 14 * 60 * 60 * 1000) },
+      { shiftId: yesterdayAfternoonShift.id, slotId: slot2.id, scanType: 'end', ticketNumber: '112', scannedAt: new Date(yesterday.getTime() + 22 * 60 * 60 * 1000) },
+      // Yesterday afternoon - Sarah - Slot 3
+      { shiftId: yesterdayAfternoonShift.id, slotId: slot3.id, scanType: 'start', ticketNumber: '050', scannedAt: new Date(yesterday.getTime() + 14 * 60 * 60 * 1000) },
+      { shiftId: yesterdayAfternoonShift.id, slotId: slot3.id, scanType: 'end', ticketNumber: '050', scannedAt: new Date(yesterday.getTime() + 22 * 60 * 60 * 1000) },
+    ],
+  });
+
+  console.log('Historical data created for yesterday');
+  console.log('Database seeded successfully!');
+}
+
+main()
+  .catch((e) => {
+    console.error('Error seeding database:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

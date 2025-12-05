@@ -1,0 +1,161 @@
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      String   @default("cashier") // "cashier" or "manager"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shifts       Shift[]
+  userStores   UserStore[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userStores   UserStore[]
+  shifts       Shift[]
+  lotteryGames LotteryGame[]
+  settings     StoreSettings?
+}
+
+model UserStore {
+  id        String   @id @default(cuid())
+  userId    String
+  storeId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, storeId])
+  @@index([userId])
+  @@index([storeId])
+}
+
+model StoreSettings {
+  id              String   @id @default(cuid())
+  storeId         String   @unique
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sheetsId        String?
+  sheetName       String?  @default("Sheet1")
+  morningStart    String   @default("06:00")
+  morningEnd      String   @default("14:00")
+  afternoonStart  String   @default("14:00")
+  afternoonEnd    String   @default("22:00")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model LotteryGame {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  gameId      String   // e.g., "1234", "5678"
+  gameName    String
+  packNumber  String?
+  pricePerTicket Float
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  slots TicketSlot[]
+
+  @@unique([storeId, gameId])
+  @@index([storeId])
+}
+
+model Shift {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date        DateTime
+  shiftType   String   // "morning" or "afternoon"
+  cashierId   String
+  cashier     User     @relation(fields: [cashierId], references: [id])
+  startTime   String
+  endTime     String?
+  qrCode      String   // e.g., "CASHIER:Sarah:Morning_Shift"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scans TicketScan[]
+
+  @@index([storeId, date, shiftType])
+  @@index([storeId])
+}
+
+model TicketSlot {
+  id          String   @id @default(cuid())
+  slotNumber  Int
+  gameId      String
+  game        LotteryGame @relation(fields: [gameId], references: [id])
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scans TicketScan[]
+
+  @@unique([slotNumber, gameId])
+}
+
+model TicketScan {
+  id              String   @id @default(cuid())
+  shiftId         String
+  shift           Shift    @relation(fields: [shiftId], references: [id])
+  slotId          String
+  slot            TicketSlot @relation(fields: [slotId], references: [id])
+  scanType        String   // "start" or "end"
+  ticketNumber    String   // e.g., "015", "025"
+  scannedAt       DateTime @default(now())
+
+  @@index([shiftId, slotId, scanType])
+}
